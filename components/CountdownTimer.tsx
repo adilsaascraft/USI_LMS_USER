@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react'
 import { parseWebinarDate } from '@/lib/parseWebinarDate'
 
 type Props = {
-  startDate: string // DD/MM/YYYY
-  startTime: string // hh:mm AM/PM
+  startDate: string
+  startTime: string
 }
 
 type TimeLeft = {
@@ -35,7 +35,6 @@ export default function CountdownTimer({ startDate, startTime }: Props) {
     const timer = setInterval(() => {
       setTimeLeft(getTimeLeft())
     }, 1000)
-
     return () => clearInterval(timer)
   }, [])
 
@@ -45,25 +44,25 @@ export default function CountdownTimer({ startDate, startTime }: Props) {
     <div
       className="
         flex flex-col items-center justify-center
-        px-3 py-2
-        rounded-lg
+        px-2 py-1
+        rounded-md
         border
         bg-blue-50
         border-blue-200
-        min-w-[56px]
+        min-w-[44px]
       "
     >
-      <span className="text-sm font-bold text-blue-700">
+      <span className="text-xs font-semibold text-blue-700 leading-tight">
         {String(value).padStart(2, '0')}
       </span>
-      <span className="text-[10px] uppercase tracking-wide text-blue-600">
+      <span className="text-[9px] uppercase tracking-tight text-blue-600">
         {label}
       </span>
     </div>
   )
 
   return (
-    <div className="mt-3 flex items-center gap-2">
+    <div className="mt-2 flex flex-wrap items-center gap-1">
       <Item value={timeLeft.days} label="Days" />
       <Item value={timeLeft.hours} label="Hrs" />
       <Item value={timeLeft.minutes} label="Min" />
