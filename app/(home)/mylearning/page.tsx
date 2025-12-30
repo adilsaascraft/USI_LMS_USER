@@ -149,7 +149,7 @@ export default function MyLearningPage() {
               {/* Image */}
               <div className="relative h-44 w-full overflow-hidden">
                 <Image
-                  src={course.courseImage}
+                  src={course.courseImage || '/avatar.png'}
                   alt={course.courseName}
                   fill
                   className="

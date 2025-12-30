@@ -4,16 +4,19 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useAuthStore } from '@/stores/authStore'
-
+import { Download, ExternalLink } from 'lucide-react'
 
 /* ================= TYPES ================= */
 
 type Module = {
   _id: string
-  courseModuleName: string
-  contentType: 'video' | 'document' | 'photos'
-  contentLink: string
-  duration?: string
+  topicName: string
+  aboutTopic: string
+  contentType: 'video' | 'document' | 'image'
+  contentUrl: string
+  videoDuration?: string
+  additionalQuestions?: string[]
+  additionalResources?: string[]
   weekCategoryId: {
     _id: string
     weekCategoryName: string
@@ -37,16 +40,13 @@ type Comment = {
 /* ================= PAGE ================= */
 
 export default function ModuleLecturePage() {
-  const params = useParams<{
+  const { courseId, moduleId } = useParams<{
     courseId: string
     moduleId: string
   }>()
 
-  const { user, isHydrated } = useAuthStore()
   const router = useRouter()
-
-  const courseId = params.courseId
-  const moduleId = params.moduleId
+  const { user, isHydrated } = useAuthStore()
 
   const [module, setModule] = useState<Module | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
@@ -57,8 +57,6 @@ export default function ModuleLecturePage() {
   /* ================= FETCH MODULE ================= */
 
   useEffect(() => {
-    if (!moduleId) return
-
     const fetchModule = async () => {
       try {
         const res = await fetch(
@@ -69,15 +67,10 @@ export default function ModuleLecturePage() {
             },
           }
         )
-
-        if (!res.ok) {
-          throw new Error(`Module fetch failed: ${res.status}`)
-        }
-
         const json = await res.json()
         setModule(json.data)
-      } catch (err) {
-        console.error('❌ Module fetch error:', err)
+      } catch (e) {
+        console.error(e)
       } finally {
         setLoading(false)
       }
@@ -89,27 +82,16 @@ export default function ModuleLecturePage() {
   /* ================= FETCH COMMENTS ================= */
 
   const fetchComments = async () => {
-    if (!courseId || !moduleId) return
-
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/courses/${courseId}/modules/${moduleId}/comments`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        }
-      )
-
-      if (!res.ok) {
-        throw new Error('Failed to fetch comments')
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/courses/${courseId}/modules/${moduleId}/comments`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
       }
-
-      const json = await res.json()
-      setComments(json.data || [])
-    } catch (err) {
-      console.error('❌ Comments fetch error:', err)
-    }
+    )
+    const json = await res.json()
+    setComments(json.data || [])
   }
 
   useEffect(() => {
@@ -118,64 +100,42 @@ export default function ModuleLecturePage() {
 
   /* ================= POST COMMENT ================= */
 
-  if (!isHydrated) {
-    return (
-      <div className="max-w-5xl mx-auto p-6 space-y-4">
-        <div className="h-6 w-1/3 bg-gray-200 rounded animate-pulse" />
-        <div className="h-40 bg-gray-200 rounded animate-pulse" />
-      </div>
-    )
-  }
-
-
   const handlePostComment = async () => {
-    if (!commentText.trim() || !module || !user) return
+    if (!commentText.trim() || !user || !module) return
 
     setPosting(true)
 
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/courses/${courseId}/modules/${moduleId}/comments`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-          body: JSON.stringify({
-            comment: commentText,
-            userId: user.id, // ✅ FIX
-            courseModuleId: module._id, // ✅ FIX
-            weekCategoryId: module.weekCategoryId._id,
-          }),
-        }
-      )
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        console.error('Backend error:', data)
-        throw new Error(data?.message || 'Comment post failed')
+    await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/courses/${courseId}/modules/${moduleId}/comments`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          comment: commentText,
+          userId: user.id,
+          courseModuleId: module._id,
+          weekCategoryId: module.weekCategoryId._id,
+        }),
       }
+    )
 
-      setCommentText('')
-      await fetchComments()
-    } catch (err) {
-      console.error('❌ Comment post error:', err)
-    } finally {
-      setPosting(false)
-    }
+    setCommentText('')
+    await fetchComments()
+    setPosting(false)
   }
-
 
   /* ================= SKELETON ================= */
 
-  if (loading) {
+  if (!isHydrated || loading) {
     return (
-      <div className="max-w-5xl mx-auto p-6 space-y-4">
-        <div className="h-6 w-1/3 bg-gray-200 rounded animate-pulse" />
-        <div className="h-32 bg-gray-200 rounded animate-pulse" />
-        <div className="h-64 bg-gray-200 rounded animate-pulse" />
+      <div className="max-w-5xl mx-auto p-6 space-y-4 animate-pulse">
+        <div className="h-4 w-1/4 bg-gray-200 rounded" />
+        <div className="h-8 w-2/3 bg-gray-200 rounded" />
+        <div className="h-32 bg-gray-200 rounded-xl" />
+        <div className="h-64 bg-gray-200 rounded-xl" />
       </div>
     )
   }
@@ -186,78 +146,122 @@ export default function ModuleLecturePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* BREADCRUMB */}
+      {/* Breadcrumb */}
       <div className="px-6 py-4 text-sm flex gap-2">
-        <button
-          onClick={() => router.back()}
-          className="text-orange-600 hover:underline"
-        >
-          E-learning Courses
+        <button onClick={() => router.back()} className="text-orange-600">
+          Courses
         </button>
-        <span className="text-gray-400">{'>'}</span>
-        <span className="text-orange-600 font-medium">
+        <span className="text-gray-400">›</span>
+        <span className="font-medium text-gray-700">
           {module.courseId.courseName}
         </span>
       </div>
 
       <div className="max-w-5xl mx-auto px-6 py-6 space-y-6">
-        {/* HEADER */}
-        <div className="bg-white rounded-2xl border shadow-sm p-6 space-y-1">
+        {/* ================= HEADER ================= */}
+        <div className="bg-white rounded-2xl border shadow-sm p-6 space-y-2">
           <p className="text-sm text-gray-500">
             {module.weekCategoryId.weekCategoryName}
           </p>
-          <h1 className="text-2xl font-semibold">{module.courseModuleName}</h1>
+          <h1 className="text-2xl font-semibold">{module.topicName}</h1>
+          <p className="text-gray-600 text-sm leading-relaxed">
+            {module.aboutTopic}
+          </p>
         </div>
 
-        {/* VIDEO */}
+        {/* ================= VIDEO ================= */}
         {module.contentType === 'video' && (
-          <div className="bg-white rounded-2xl border shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-center mb-4">
-              Video Content {module.duration && `(${module.duration})`}
-            </h2>
-
+          <div className="bg-white rounded-2xl border shadow-sm p-6 space-y-4">
             <div className="aspect-video rounded-xl overflow-hidden">
               <iframe
-                src={module.contentLink}
+                src={module.contentUrl}
                 className="w-full h-full"
                 allow="autoplay; fullscreen"
                 allowFullScreen
               />
             </div>
+
+            {/* Resources */}
+            {module.additionalResources?.length ? (
+              <div className="flex flex-wrap gap-3">
+                {module.additionalResources.map((link, i) => (
+                  <a
+                    key={i}
+                    href={link}
+                    target="_blank"
+                    className="px-4 py-2 text-sm rounded-lg border bg-gray-50 hover:bg-gray-100 flex items-center gap-2"
+                  >
+                    <ExternalLink size={14} /> Resource {i + 1}
+                  </a>
+                ))}
+              </div>
+            ) : null}
           </div>
         )}
 
-        {/* DOCUMENT / PHOTOS */}
+        {/* ================= VIEW / DOWNLOAD ================= */}
         {module.contentType !== 'video' && (
-          <div className="bg-white rounded-2xl border shadow-sm p-6">
-            <h2 className="text-lg font-semibold mb-4 text-center">
-              View Content
-            </h2>
+          <div className="bg-white rounded-2xl border shadow-sm p-6 space-y-4">
+            <h2 className="font-semibold text-lg">View Content</h2>
 
-            <div className="border rounded-xl p-4 flex justify-between items-center">
-              <span className="text-sm font-medium">
-                {module.courseModuleName}
-              </span>
+            <div className="flex flex-wrap gap-4">
+              <a
+                href={module.contentUrl}
+                download
+                className="px-5 py-2 rounded-lg bg-blue-600 text-white text-sm flex items-center gap-2"
+              >
+                <Download size={16} /> Download Content
+              </a>
 
               <a
-                href={module.contentLink}
+                href={module.contentUrl}
                 target="_blank"
-                className="px-4 py-2 text-xs rounded-md bg-[#1F5C9E] text-white"
+                className="px-5 py-2 rounded-lg border text-sm flex items-center gap-2"
               >
-                Open
+                <ExternalLink size={16} /> View Content
               </a>
             </div>
           </div>
         )}
 
-        {/* COMMENTS */}
-        <div className="bg-white rounded-2xl border shadow-sm p-6 space-y-4">
-          <h2 className="text-lg font-semibold">
-            Comments ({comments.length})
-          </h2>
+        {/* ================= QUESTIONS ================= */}
+        {module.additionalQuestions?.length ? (
+          <div className="bg-white rounded-2xl border shadow-sm p-6">
+            <h2 className="font-semibold mb-3">Questions</h2>
+            <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700">
+              {module.additionalQuestions.map((q, i) => (
+                <li key={i}>{q}</li>
+              ))}
+            </ol>
+          </div>
+        ) : null}
 
+        {/* ================= COMMENT BOX ================= */}
+        <div className="bg-white rounded-2xl border shadow-sm p-6 space-y-4">
+          <textarea
+            rows={4}
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            placeholder="Write your comment..."
+            className="w-full border rounded-lg p-3 text-sm"
+          />
+
+          <button
+            onClick={handlePostComment}
+            disabled={posting}
+            className="px-6 py-2 rounded-lg bg-blue-600 text-white text-sm disabled:opacity-50"
+          >
+            {posting ? 'Posting...' : 'Post Comment'}
+          </button>
+        </div>
+
+        {/* ================= COMMENTS LIST ================= */}
+        <div className="space-y-4">
           {comments.map((c) => (
-            <div key={c._id} className="border rounded-xl p-4 space-y-1">
+            <div
+              key={c._id}
+              className="bg-white rounded-xl border p-4 space-y-1"
+            >
               <div className="flex items-center gap-3">
                 {c.userId.profilePicture && (
                   <Image
@@ -268,37 +272,14 @@ export default function ModuleLecturePage() {
                     className="rounded-full"
                   />
                 )}
-                <p className="text-sm font-medium">{c.userId.name}</p>
+                <p className="font-medium text-sm">{c.userId.name}</p>
               </div>
-
               <p className="text-xs text-gray-500">
                 {new Date(c.createdAt).toLocaleString()}
               </p>
-
               <p className="text-sm text-gray-700">{c.comment}</p>
             </div>
           ))}
-        </div>
-
-        {/* REPLY */}
-        <div className="bg-white rounded-2xl border shadow-sm p-6 space-y-4">
-          <h2 className="text-lg font-semibold">Leave a Reply</h2>
-
-          <textarea
-            rows={5}
-            value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
-            placeholder="Write your comment..."
-            className="w-full border rounded-lg p-3 text-sm"
-          />
-
-          <button
-            onClick={handlePostComment}
-            disabled={posting}
-            className="px-5 py-2 text-sm rounded-lg bg-[#1F5C9E] text-white disabled:opacity-50"
-          >
-            {posting ? 'Posting...' : 'Post Comment'}
-          </button>
         </div>
       </div>
     </div>
